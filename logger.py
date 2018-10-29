@@ -7,11 +7,11 @@ from torchvision.models import resnet18
 
 @dataclass
 class CSVLogger(LearnerCallback):
-    "A `LearnerCallback` that "
-    filename: str = 'history.csv'
+    "A `LearnerCallback` that saves history of training metrics into CSV file."
+    filename: str = 'history'
 
     def __post_init__(self):
-        self.path = Path(self.filename)
+        self.path = self.learn.path/f'{self.filename}.csv'
         self.file = None
 
     @property
@@ -43,7 +43,7 @@ class CSVLogger(LearnerCallback):
 def main():
     path = untar_data(URLs.MNIST_TINY)
     data = ImageDataBunch.from_folder(path)
-    learn = ConvLearner(data, resnet18, metrics=[accuracy, error_rate])
+    learn = create_cnn(data, resnet18, metrics=[accuracy, error_rate])
     cb = CSVLogger(learn)
     learn.fit(3, callbacks=[cb])
     print(cb.read_logged_file())
