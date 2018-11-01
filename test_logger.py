@@ -46,6 +46,17 @@ def test_callback_written_metrics_are_equal_to_reported_via_stdout(classifier_an
     pd.testing.assert_frame_equal(csv_df, stdout_df)
 
 
+def test_callback_written_metrics_are_equal_to_values_stored_in_reporter(classifier_and_logger):
+    n_epochs = 3
+    classifier, cb = classifier_and_logger
+
+    classifier.fit(n_epochs, callbacks=[cb])
+
+    csv_df = cb.read_logged_file()
+    recorder_df = create_metrics_dataframe(classifier)
+    pd.testing.assert_frame_equal(csv_df, recorder_df)
+
+
 @pytest.fixture
 def classifier(tmpdir):
     path = untar_data(URLs.MNIST_TINY)
@@ -70,6 +81,7 @@ def no_bar():
 
 
 def convert_into_dataframe(buffer):
+    "Converts data captured from `fastprogress.ConsoleProgressBar` into dataframe."
     lines = buffer.getvalue().split('\n')
     header, *lines = [l.strip() for l in lines if l]
     header = header.split()
@@ -78,3 +90,22 @@ def convert_into_dataframe(buffer):
     df = pd.DataFrame(records, columns=header)
     df['epoch'] = df['epoch'].astype(int)
     return df
+
+
+def create_metrics_dataframe(learn):
+    "Converts metrics stored in `Recorder` into dataframe."
+    records = [
+        [i, loss, val_loss, *epoch_metrics]
+        for i, (loss, val_loss, epoch_metrics)
+        in enumerate(zip(
+            get_train_losses(learn),
+            learn.recorder.val_losses,
+            learn.recorder.metrics), 1)]
+    return pd.DataFrame(records, columns=learn.recorder.names)
+
+
+def get_train_losses(learn):
+    "Returns list of training losses at the end of each training epoch."
+    np_losses = [to_np(l).item() for l in learn.recorder.losses]
+    batch_size = len(learn.data.train_dl)
+    return [batch[-1] for batch in partition(np_losses, batch_size)]
